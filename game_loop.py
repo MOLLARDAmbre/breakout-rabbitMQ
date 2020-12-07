@@ -5,6 +5,7 @@ import pika
 import uuid
 from pygame.locals import *
 from ui import ui_manager
+from events import event_type
 
 def main(fps):
     pygame.init()
@@ -16,15 +17,34 @@ def main(fps):
         rects = ui.draw_elements()
         ui.update_elements()
         pygame.display.update(rects)
+        clock.tick(FPS)
         for event in pygame.event.get():
+            forward_event(event)
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit(0)
-            else:
-                ui.forward_event(event)
-        clock.tick(FPS)
     pygame.quit()
     sys.exit(0)
+
+
+def forward_event(event):
+    connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host='localhost'))
+    channel = connection.channel()
+    channel.exchange_declare(exchange='event',
+                             exchange_type='fanout')
+    message = -1 # Default
+    if event.type == QUIT:
+        message = event_type.QUIT
+    if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_LEFT:
+            message = event_type.MOVE_LEFT
+        if event.key == pygame.K_RIGHT:
+            message = event_type.MOVE_RIGHT
+    message = str(int(message))
+    channel.basic_publish(exchange='event',
+                          routing_key='',
+                          body=message)
 
 
 def listen_for_game_over():

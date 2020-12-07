@@ -34,12 +34,3 @@ class ui_manager():
         self.ball.check_bounds(self.width)
         self.ball.check_ceiling()
         self.ball.check_death(self.height)
-        self.blocks.clear_deleted(self.surface)
-
-    def forward_event(self, event):
-        # TODO lancer des lapins
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                self.bouncer.move_left()
-            if event.key == pygame.K_RIGHT:
-                self.bouncer.move_right()

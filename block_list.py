@@ -1,22 +1,21 @@
 import pygame
 import pika
+import uuid
+import _thread
 from random import randint
 
 class Block():
-    def __init__(self, pos, width, height, col=None):
+    def __init__(self, pos, width, height, table_width, col=None):
         self.pos = pos
         self.width = width
         self.height = height
+        self.table_width = table_width
         self.curr_rect = self.get_rect_from_pos()
-        self.to_remove = False
-        self.parent = None
+        self.collision_enabled = True
         if col == None:
             self.col = (0, 0, 0)
         else:
             self.col = col
-
-    def add_parent(self, parent):
-        self.parent = parent
 
     def draw(self, surface):
         rects = [self.curr_rect]
@@ -41,12 +40,30 @@ class Block():
 
 
     def check_collisions(self, ball):
+        if not self.collision_enabled:
+            return False
         if self.curr_rect.colliderect(ball.curr_rect):
             self.send_message_bounce(self.get_angle(ball))
-            self.parent.remove(self)
+            self.send_message_remove()
+            self.collision_enabled = False  # Disable collision to avoir problems while waiting for the message to be received
         else:
             return False
         return True  # Returning this prevents the ball from colliding twice at the same time
+
+    def encode_pos(self):
+        return str(self.pos[1] * self.table_width + self.pos[0])
+
+    def send_message_remove(self):
+        connection = pika.BlockingConnection(pika.ConnectionParameters(
+                host='localhost'))
+        channel = connection.channel()
+        channel.exchange_declare(exchange='remove',
+                                 exchange_type='fanout')
+        message = self.encode_pos() # 1 for vertical, 0 for horizontal
+        channel.basic_publish(exchange='remove',
+                              routing_key='',
+                              body=message)
+        return
 
     def send_message_bounce(self, body):
         connection = pika.BlockingConnection(pika.ConnectionParameters(
@@ -90,18 +107,17 @@ class BlockList():
         self.curr_time = 0
         self.to_remove = None
         self.blocks = [[self.generate_block(i, j) for i in range(width)] for j in range(height)]
-        self.link_children()
-
-    def link_children(self):
-        for block_line in self.blocks:
-            for block in block_line:
-                block.add_parent(self)
+        _thread.start_new_thread(self.listen_for_remove, ())
 
     def update(self):
         self.curr_time += 1
         if self.curr_time == self.timer:
             self.add_line()
             self.curr_time = 0
+        if self.to_remove != None:
+            height, width = self.to_remove
+            self.blocks[height][width] = NoBlock()
+            self.to_remove = None
         return
 
     def draw(self, surface):
@@ -111,15 +127,33 @@ class BlockList():
                 rects += block.draw(surface)
         return rects
 
-    def remove(self, block):
-        # TODO attraper le lapin
-        self.blocks[block.pos[1]][block.pos[0]] = NoBlock()
-        self.to_remove = block
+    def decode_pos(self, encoded_str):
+        nb = int(encoded_str)
+        height = nb // self.width
+        width = nb % self.width
+        return [width, height]
 
-    def clear_deleted(self, surface):
-        if self.to_remove != None:
-            pygame.draw.rect(surface, (255,255,255), self.to_remove.curr_rect)
-            self.to_remove = None
+    def listen_for_remove(self):
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+        channel = connection.channel()
+        channel.exchange_declare(exchange='remove', exchange_type='fanout')
+        _uuid=str(uuid.uuid4())
+        result = channel.queue_declare(exclusive=True, queue=_uuid)
+        queue_name = result.method.queue
+        channel.queue_bind(exchange='remove', queue=queue_name)
+
+        def callback(ch, method, properties, body):
+            self.remove(body)
+
+        channel.basic_consume(queue_name, callback,
+                              auto_ack=True)
+        channel.start_consuming()
+
+    def remove(self, encoded_str):
+        width, height = self.decode_pos(encoded_str)
+        block = self.blocks[height][width]
+        self.to_remove = (height, width)
+        block.col = (255, 255, 255)
 
     def add_line(self):
         new_blocks = [[NoBlock() for i in range(self.width)] for j in range(self.height)]
@@ -133,7 +167,6 @@ class BlockList():
                     new_blocks[block.pos[1]][block.pos[0]] = block
         self.blocks = new_blocks
         self.blocks[0] = [self.generate_block(i, 0) for i in range(self.width)]
-        self.link_children()
         return
 
     def check_collisions(self, ball):
@@ -160,5 +193,5 @@ class BlockList():
         if r < 67:
             return NoBlock()
         col = (randint(0, 255), randint(0, 255), randint(0, 255))
-        block = Block([i, j], self.block_width, self.block_height, col=col)
+        block = Block([i, j], self.block_width, self.block_height, self.width, col=col)
         return block

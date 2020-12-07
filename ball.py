@@ -37,7 +37,8 @@ class Ball():
 
     def check_ceiling(self):
         if self.pos[1] < 0:
-            self.bounce(True)
+            self.pos[1] = 0
+            self.speed[1] = abs(self.speed[1])
         return
 
     def check_death(self, limit):

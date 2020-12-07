@@ -1,5 +1,8 @@
 import pygame
 import pika
+import _thread
+import uuid
+from events import event_type
 
 class Bouncer():
     def __init__(self, init_pos, width=60, height=10):
@@ -8,9 +11,9 @@ class Bouncer():
         self.height = height
         self.curr_rect = self.get_rect_from_pos()
         self.direction = 0
+        _thread.start_new_thread(self.listen_for_event, ())
 
     def update(self):
-        # TODO attraper le lapin
         if self.direction <= -1:
             self.pos = [self.pos[0] - 10, self.pos[1]]
         if self.direction >= 1:
@@ -53,6 +56,25 @@ class Bouncer():
                               routing_key='',
                               body=message)
         return
+
+    def listen_for_event(self):
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+        channel = connection.channel()
+        channel.exchange_declare(exchange='event', exchange_type='fanout')
+        _uuid=str(uuid.uuid4())
+        result = channel.queue_declare(exclusive=True, queue=_uuid)
+        queue_name = result.method.queue
+        channel.queue_bind(exchange='event', queue=queue_name)
+
+        def callback(ch, method, properties, body):
+            if int(body) == event_type.MOVE_LEFT:
+                self.move_left()
+            if int(body) == event_type.MOVE_RIGHT:
+                self.move_right()
+
+        channel.basic_consume(queue_name, callback,
+                              auto_ack=True)
+        channel.start_consuming()
 
 
     def get_rect_from_pos(self):
