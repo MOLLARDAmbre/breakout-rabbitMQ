@@ -1,33 +1,31 @@
 import pika
+import uuid
 
-connection = pika.BlockingConnection(pika.ConnectionParameters(
-        host='localhost'))
-channel = connection.channel()
-
-channel.exchange_declare(exchange='logs',
-                         exchange_type='fanout')
-
-message = ' '.join(sys.argv[1:]) or "info: Hello World!"
-channel.basic_publish(exchange='logs',
-                      routing_key='',
-                      body=message)
-print(" [x] Sent %r" % message)
-connection.close()
+def send(channel_name, message):
+    connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host='localhost'))
+    channel = connection.channel()
+    channel.exchange_declare(exchange=channel_name,
+                             exchange_type='fanout')
+    channel.basic_publish(exchange=channel_name,
+                          routing_key='',
+                          body=str(message))
+    connection.close()
 
 
-_uuid=str(uuid.uuid4())
-result = channel.queue_declare(exclusive=True, queue=_uuid)
-queue_name = result.method.queue
+def recv(channel_name, callbck):
+    _uuid=str(uuid.uuid4())
+    connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host='localhost'))
+    channel = connection.channel()
+    result = channel.queue_declare(exclusive=True, queue=_uuid)
+    queue_name = result.method.queue
+    channel.queue_bind(exchange=channel_name,
+                       queue=queue_name)
 
-channel.queue_bind(exchange='logs',
-                   queue=queue_name)
+    def callback(ch, method, properties, body):
+        return callbck(ch, method, properties, body)
 
-print(' [*] Waiting for logs. To exit press CTRL+C')
-
-def callback(ch, method, properties, body):
-    print(" [x] %r" % body)
-
-channel.basic_consume(queue_name, callback,
-                      auto_ack=True)
-
-channel.start_consuming()
+    channel.basic_consume(queue_name, callback,
+                          auto_ack=True)
+    channel.start_consuming()

@@ -4,6 +4,7 @@ import _thread
 import uuid
 import pika
 from random import randint
+from rabbit_sender import send, recv
 
 class Ball():
     def __init__(self, init_pos, size=6):
@@ -46,15 +47,7 @@ class Ball():
             self.send_message_game_over()
 
     def send_message_game_over(self):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(
-                host='localhost'))
-        channel = connection.channel()
-        channel.exchange_declare(exchange='game_over',
-                                 exchange_type='fanout')
-        message = "blocks"
-        channel.basic_publish(exchange='game_over',
-                              routing_key='',
-                              body=message)
+        send('game_over', "blocks")
 
     def bounce(self, vertical):
         """
@@ -71,29 +64,12 @@ class Ball():
             self.speed = [-self.speed[0], self.speed[1]]
 
     def listen_for_bounce(self):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(
-                host='localhost'))
-        channel = connection.channel()
-
-        channel.exchange_declare(exchange='bounce',
-                                 exchange_type='fanout')
-        _uuid=str(uuid.uuid4())
-        result = channel.queue_declare(exclusive=True, queue=_uuid)
-        queue_name = result.method.queue
-        channel.queue_bind(exchange='bounce',
-                           queue=queue_name)
         def callback(ch, method, properties, body):
             if int(body) == 0:
                 self.bounce(False)
             else:
-                if int(body) == 1:
-                    self.bounce(True)
-                else:
-                    import pdb; pdb.set_trace()
-        channel.basic_consume(queue_name, callback,
-                              auto_ack=True)
-        channel.start_consuming()
-
+                self.bounce(True)
+        recv('bounce', callback)
 
     def get_rect_from_pos(self):
         return pygame.Rect(self.pos[0] - self.size / 2, self.pos[1] - self.size / 2, \

@@ -3,6 +3,7 @@ import pika
 import uuid
 import _thread
 from random import randint
+from rabbit_sender import send, recv
 
 class Block():
     def __init__(self, pos, width, height, table_width, col=None):
@@ -54,28 +55,10 @@ class Block():
         return str(self.pos[1] * self.table_width + self.pos[0])
 
     def send_message_remove(self):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(
-                host='localhost'))
-        channel = connection.channel()
-        channel.exchange_declare(exchange='remove',
-                                 exchange_type='fanout')
-        message = self.encode_pos() # 1 for vertical, 0 for horizontal
-        channel.basic_publish(exchange='remove',
-                              routing_key='',
-                              body=message)
-        return
+        send('remove', self.encode_pos())
 
     def send_message_bounce(self, body):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(
-                host='localhost'))
-        channel = connection.channel()
-        channel.exchange_declare(exchange='bounce',
-                                 exchange_type='fanout')
-        message = body # 1 for vertical, 0 for horizontal
-        channel.basic_publish(exchange='bounce',
-                              routing_key='',
-                              body=message)
-        return
+        send('bounce', body)
 
     def get_rect_from_pos(self):
         return pygame.Rect(self.pos[0] * self.width, self.pos[1] * self.height, \
@@ -134,20 +117,9 @@ class BlockList():
         return [width, height]
 
     def listen_for_remove(self):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
-        channel = connection.channel()
-        channel.exchange_declare(exchange='remove', exchange_type='fanout')
-        _uuid=str(uuid.uuid4())
-        result = channel.queue_declare(exclusive=True, queue=_uuid)
-        queue_name = result.method.queue
-        channel.queue_bind(exchange='remove', queue=queue_name)
-
         def callback(ch, method, properties, body):
             self.remove(body)
-
-        channel.basic_consume(queue_name, callback,
-                              auto_ack=True)
-        channel.start_consuming()
+        recv('remove', callback)
 
     def remove(self, encoded_str):
         width, height = self.decode_pos(encoded_str)
@@ -176,15 +148,7 @@ class BlockList():
                     return
 
     def send_message_game_over(self):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(
-                host='localhost'))
-        channel = connection.channel()
-        channel.exchange_declare(exchange='game_over',
-                                 exchange_type='fanout')
-        message = "blocks"
-        channel.basic_publish(exchange='game_over',
-                              routing_key='',
-                              body=message)
+        send('game_over', "blocks")
 
     def generate_block(self, i, j):
         if j > self.height / 3:
