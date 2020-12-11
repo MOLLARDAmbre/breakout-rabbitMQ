@@ -6,6 +6,9 @@ from events import event_type
 from rabbit_sender import send, recv
 
 class Bouncer():
+    """
+    Represents the player, on which the ball can bounce off of
+    """
     def __init__(self, init_pos, width=60, height=10):
         self.pos = init_pos
         self.width = width
@@ -31,7 +34,6 @@ class Bouncer():
         if self.direction > 1:
             self.direction = 1
 
-
     def draw(self, surface):
         rects = [self.curr_rect]
         new_rect = self.get_rect_from_pos()
@@ -50,6 +52,9 @@ class Bouncer():
         send('bounce', 1)
 
     def listen_for_event(self):
+        """
+        Listens for messages which will direct the movement direction
+        """
         def callback(ch, method, properties, body):
             if int(body) == event_type.MOVE_LEFT:
                 self.move_left()

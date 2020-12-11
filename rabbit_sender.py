@@ -1,7 +1,15 @@
 import pika
 import uuid
 
+"""
+Helper file used to factor the functions used to send and/or receive rabbitmq messages
+"""
+
 def send(channel_name, message):
+    """
+    Sends a message to the channel on localhost
+    We use fanout mode since the idea is that anyone could listen to any event
+    """
     connection = pika.BlockingConnection(pika.ConnectionParameters(
             host='localhost'))
     channel = connection.channel()
@@ -14,6 +22,10 @@ def send(channel_name, message):
 
 
 def recv(channel_name, callbck):
+    """
+    Connect to a channel on localhost
+    Use it on a new thread since it will block the thread using it
+    """
     _uuid=str(uuid.uuid4())
     connection = pika.BlockingConnection(pika.ConnectionParameters(
             host='localhost'))

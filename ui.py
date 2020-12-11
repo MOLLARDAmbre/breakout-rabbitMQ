@@ -4,6 +4,9 @@ from bouncer import Bouncer
 from ball import Ball
 
 class ui_manager():
+    """
+    Will deal with the ui
+    """
     def __init__(self, width=25, width_mul=20, height=15, height_mul=20):
         WHITE = (255, 255, 255)
         self.width = width * width_mul

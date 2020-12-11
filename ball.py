@@ -7,6 +7,9 @@ from random import randint
 from rabbit_sender import send, recv
 
 class Ball():
+    """
+    A class that describes the ball
+    """
     def __init__(self, init_pos, size=6):
         self.speed = [randint(1, 4) + 0.2, -randint(1, 4) - 0.2]
         self.pos = init_pos
@@ -30,6 +33,9 @@ class Ball():
         return rects
 
     def check_bounds(self, limit):
+        """
+        Checks the ball is within the given bounds (x-axis only)
+        """
         if self.pos[0] < 0:
             self.pos[0] += limit
         if self.pos[0] > limit:
@@ -37,12 +43,18 @@ class Ball():
         return
 
     def check_ceiling(self):
+        """
+        Makes sure the ball bounces on the ceiling
+        """
         if self.pos[1] < 0:
             self.pos[1] = 0
             self.speed[1] = abs(self.speed[1])
         return
 
     def check_death(self, limit):
+        """
+        Triggers game over on ball low enough
+        """
         if self.pos[1] > limit:
             self.send_message_game_over()
 
@@ -64,6 +76,9 @@ class Ball():
             self.speed = [-self.speed[0], self.speed[1]]
 
     def listen_for_bounce(self):
+        """
+        Listens for a bounce message
+        """
         def callback(ch, method, properties, body):
             if int(body) == 0:
                 self.bounce(False)

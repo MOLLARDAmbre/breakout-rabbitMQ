@@ -6,6 +6,9 @@ from random import randint
 from rabbit_sender import send, recv
 
 class Block():
+    """
+    Represents a block to be broken
+    """
     def __init__(self, pos, width, height, table_width, col=None):
         self.pos = pos
         self.width = width
@@ -28,9 +31,15 @@ class Block():
         return rects
 
     def isnt_noblock(self):
+        """
+        Checks whether the block is actually a block or an empty space
+        """
         return True
 
     def get_angle(self, ball):
+        """
+        Computes whether we want to bounce vertically or horizontally
+        """
         xy = [self.pos[0] - ball.pos[0], self.pos[1] - ball.pos[1]]
         scal = xy[0] * 1 + xy[1] * 0  # Compute scalar product with unit vector (1, 0)
         scal = scal * scal  # We compare the square of the scalar product to avoid dealing with orientation
@@ -41,7 +50,10 @@ class Block():
 
 
     def check_collisions(self, ball):
-        if not self.collision_enabled:
+        """
+        Checks for collisiosn
+        """
+        if not self.collision_enabled:  # Allow to disable collisions while waiting for the message to be received
             return False
         if self.curr_rect.colliderect(ball.curr_rect):
             self.send_message_bounce(self.get_angle(ball))
@@ -52,6 +64,9 @@ class Block():
         return True  # Returning this prevents the ball from colliding twice at the same time
 
     def encode_pos(self):
+        """
+        Encodes the position into a string to be sent
+        """
         return str(self.pos[1] * self.table_width + self.pos[0])
 
     def send_message_remove(self):
@@ -81,6 +96,9 @@ class NoBlock(Block):
         return False
 
 class BlockList():
+    """
+    Represents the set of blocks
+    """
     def __init__(self, width, block_width, height, block_height, timer=600):
         self.width = width
         self.height = height
@@ -93,7 +111,7 @@ class BlockList():
         _thread.start_new_thread(self.listen_for_remove, ())
 
     def update(self):
-        self.curr_time += 1
+        self.curr_time += 1  # We have a timer before we send all blocks down
         if self.curr_time == self.timer:
             self.add_line()
             self.curr_time = 0
@@ -111,6 +129,9 @@ class BlockList():
         return rects
 
     def decode_pos(self, encoded_str):
+        """
+        Decodes the position of the block to be removed
+        """
         nb = int(encoded_str)
         height = nb // self.width
         width = nb % self.width
@@ -128,6 +149,9 @@ class BlockList():
         block.col = (255, 255, 255)
 
     def add_line(self):
+        """
+        Moves all blocks down one line, and add one at the top
+        """
         new_blocks = [[NoBlock() for i in range(self.width)] for j in range(self.height)]
         for block_line in self.blocks:
             for block in block_line:
@@ -151,6 +175,9 @@ class BlockList():
         send('game_over', "blocks")
 
     def generate_block(self, i, j):
+        """
+        Generates a block to be added at position (i, j)
+        """
         if j > self.height / 3:
             return NoBlock()  # We don't want to start the game with too many blocks
         r = randint(0, 100)

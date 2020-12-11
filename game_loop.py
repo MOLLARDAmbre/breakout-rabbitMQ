@@ -15,11 +15,11 @@ def main(fps):
     FPS = fps
 
     while True:  # Game loop
-        rects = ui.draw_elements()
-        ui.update_elements()
-        pygame.display.update(rects)
-        clock.tick(FPS)
-        for event in pygame.event.get():
+        rects = ui.draw_elements()  # Draws elements
+        ui.update_elements()  # Update elements
+        pygame.display.update(rects)  # pygame command to actually update the display
+        clock.tick(FPS)  # Limits the fps rate to 60
+        for event in pygame.event.get():  # Get the pygame events and forward them
             forward_event(event)
             if event.type == QUIT:
                 pygame.quit()
@@ -29,6 +29,9 @@ def main(fps):
 
 
 def forward_event(event):
+    """
+    Sends rabbitmq messages to forward pygame key events
+    """
     message = -1 # Default
     if event.type == QUIT:
         message = event_type.QUIT
@@ -42,6 +45,9 @@ def forward_event(event):
 
 
 def listen_for_game_over():
+    """
+    Checks for messages signaling a game over
+    """
     def callback(ch, method, properties, body):
         pygame.event.post(pygame.event.Event(QUIT))
     recv('game_over', callback)
